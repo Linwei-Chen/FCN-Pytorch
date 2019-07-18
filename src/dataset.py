@@ -12,16 +12,6 @@ import torchvision.transforms.functional as F
 
 CROP_SIZE = 128
 
-def image2label(img):
-    cm2lbl = np.zeros(256 ** 3)
-    for i, cm in enumerate(COLORMAP):
-        cm2lbl[(cm[0] * 256 + cm[1]) * 256 + cm[2]] = i
-
-    data = np.array(img, dtype=np.int32)
-    idx = (data[:, :, 0] * 256 + data[:, :, 1] * 256 + data[:, :, 2])
-    return np.array(cm2lbl[idx], dtype=np.int64)
-
-
 CLASSES = ['background', 'aeroplane', 'bicycle', 'bird', 'boat',
            'bottle', 'bus', 'car', 'cat', 'chair', 'cow', 'diningtable',
            'dog', 'horse', 'motorbike', 'person', 'potted plant',
@@ -33,6 +23,16 @@ COLORMAP = [[0, 0, 0], [128, 0, 0], [0, 128, 0], [128, 128, 0], [0, 0, 128],
             [64, 128, 0], [192, 128, 0], [64, 0, 128], [192, 0, 128],
             [64, 128, 128], [192, 128, 128], [0, 64, 0], [128, 64, 0],
             [0, 192, 0], [128, 192, 0], [0, 64, 128]]
+
+
+def image2label(img):
+    cm2lbl = np.zeros(256 ** 3)
+    for i, cm in enumerate(COLORMAP):
+        cm2lbl[(cm[0] * 256 + cm[1]) * 256 + cm[2]] = i
+
+    data = np.array(img, dtype=np.int32)
+    idx = (data[:, :, 0] * 256 + data[:, :, 1] * 256 + data[:, :, 2])
+    return np.array(cm2lbl[idx], dtype=np.int64)
 
 
 class Compose2(object):

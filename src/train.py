@@ -25,7 +25,7 @@ def config():
     parser.add_argument('--dataset', type=str, default='2012',
                         choices=['2007', '2012'], help='Choose between voc2007/2012.')
     # Optimization options
-    parser.add_argument('--optimizer_name', '-op', type=str, default='Adam', help='Optimizer to train model.')
+    parser.add_argument('--optimizer', '-op', type=str, default='Adam', help='Optimizer to train model.')
     parser.add_argument('--epochs', '-e', type=int, default=500, help='Number of epochs to train.')
     parser.add_argument('--batch_size', '-b', type=int, default=4, help='Batch size.')
     parser.add_argument('--lr', type=float, default=0.1, help='The Learning Rate.')
@@ -52,7 +52,7 @@ def config():
     # i/o
     parser.add_argument('--log', type=str, default=None, help='Log folder.')
     args = parser.parse_args()
-    args.optimizer_name = args.optimizer_name.lower()
+    args.optimizer = args.optimizer.lower()
     if args.save is None:
         args.save = f'../{args.model_name}_{args.dataset}'
     if args.log is None:
@@ -77,7 +77,7 @@ def config():
 
 
 def get_device(args):
-    return torch.device('gpu' if args.ngpu >= 1 and torch.cuda.is_available() else 'cpu')
+    return torch.device('cuda' if args.ngpu >= 1 and torch.cuda.is_available() else 'cpu')
 
 
 def model_accelerate(args, model):
@@ -121,11 +121,12 @@ def train_one_epoch(args, model, optimizer, train_loader, logger, model_saver):
         t2 = time.perf_counter()
         print(f'step:{step} | loss:{loss.item():.8f} | lr:{get_lr(optimizer)} | time:{t2 - t1}')
         logger.log(key='train_loss', data=loss.item())
+        # save the model, optimizer every args.save_steps
         if step % args.save_steps == 0:
             logger.visualize(key='train_loss', range=(-1000, -1))
             logger.save_log()
             model_saver.save(name=args.model_name, model=model)
-            model_saver.save(name=args.optimizer_name, model=optimizer)
+            model_saver.save(name=args.optimizer, model=optimizer)
             # break
 
 
@@ -193,16 +194,16 @@ def pixel_acc(pred, target):
 if __name__ == "__main__":
     # init the tools
     args = config()
-    logger = Logger(save_path=args.save, json_name=args.optimizer_name)
-    model_saver = ModelSaver(save_path=args.save, name_list=[args.optimizer_name, args.model_name])
+    logger = Logger(save_path=args.save, json_name=args.optimizer)
+    model_saver = ModelSaver(save_path=args.save, name_list=[args.optimizer, args.model_name])
 
     # get model
     model = get_model(name=args.model_name, n_class=args.n_class)
     model_saver.load(name=args.model_name, model=model)
 
     # get optimizer
-    optimizer = get_optimizer(args, name=args.optimizer_name, model=model)
-    model_saver.load(name=args.optimizer_name, model=optimizer)
+    optimizer = get_optimizer(args, name=args.optimizer, model=model)
+    model_saver.load(name=args.optimizer, model=optimizer)
 
     # Accelerate the model training
     device = get_device(args)

@@ -3,6 +3,11 @@ import os.path as osp
 import json
 import torch
 
+"""
+Logger is built to log the information during the model train like loss, accuracy
+ModelSaver is design to save the state_dict of model, optimizer, scheduler etc safetly
+Author: Charles Chen
+"""
 
 class Logger:
     def __init__(self, save_path, json_name):
@@ -18,6 +23,10 @@ class Logger:
         # if 'max' not in self.state: self.state['max'] = {}
 
     def get_data(self, key):
+        """
+        :param key: key word of data
+        :return: data[key]
+        """
         if key not in self.state:
             print(f'*** find no {key} data!')
             return []
@@ -25,6 +34,11 @@ class Logger:
             return self.state[key]
 
     def get_max(self, key):
+        """
+
+        :param key:
+        :return:
+        """
         if key not in self.state:
             print(f'*** find no {key} data!')
             return float('-inf')
