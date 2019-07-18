@@ -6,6 +6,7 @@ from torchvision import transforms
 from train import config, get_device
 from imgs_dir_reader import from_dir_get_imgs_list
 import numbers
+from dataset import CLASSES, COLORMAP
 
 
 class Predict:
@@ -14,6 +15,7 @@ class Predict:
         self.model.eval()
         self.device = torch.device('cuda' if torch.cuda.is_available() and cuda else 'cpu')
         self.model = self.model.to(self.device)
+        self.color_map = torch.Tensor(COLORMAP)
 
     def predict_one_img(self, img_path):
         img, img_tensor = self.from_PIL_path_to_Tensor(img_path)
@@ -26,7 +28,10 @@ class Predict:
 
         pred = self.model(img_tensor)  # shape[1, n_class, h, w]
         pred = pred.argmax(dim=1, keepdim=True)  # shape[1, 1, h, w]
-        print(f'pred:{pred.size()}')
+        pred = pred.squeeze()  # shape[ h, w]
+        print(f'pred size:{pred.size()}\npred:{pred}')
+        pred_img = self.from_pred_to_color_img(pred)
+        pred_img.show()
 
     @staticmethod
     def from_PIL_path_to_Tensor(img_path, resize=224):
@@ -41,6 +46,18 @@ class Predict:
             img = img.resize(resize)
         img_tensor = transforms.ToTensor()(img)
         return img, img_tensor
+
+    def from_pred_to_color_img(self, pred):
+        h, w = pred.size()
+        temp = torch.zeros((3, h, w))
+        for i in range(h):
+            for j in range(w):
+                temp[:, i, j] = self.color_map[pred[i, j]]
+        return transforms.ToPILImage()(temp)
+
+    @staticmethod
+    def merge_two_img(img1, img2):
+        pass
 
 
 if __name__ == '__main__':

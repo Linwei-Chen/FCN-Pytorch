@@ -12,10 +12,11 @@ import torchvision.transforms.functional as F
 
 CROP_SIZE = 128
 
-CLASSES = ['background', 'aeroplane', 'bicycle', 'bird', 'boat',
-           'bottle', 'bus', 'car', 'cat', 'chair', 'cow', 'diningtable',
-           'dog', 'horse', 'motorbike', 'person', 'potted plant',
-           'sheep', 'sofa', 'train', 'tv/monitor']
+CLASSES = ['background',
+           'aeroplane', 'bicycle', 'bird', 'boat', 'bottle',
+           'bus', 'car', 'cat', 'chair', 'cow',
+           'diningtable', 'dog', 'horse', 'motorbike','person',
+           'potted plant', 'sheep', 'sofa', 'train', 'tv/monitor']
 
 # RGB color for each class.
 COLORMAP = [[0, 0, 0], [128, 0, 0], [0, 128, 0], [128, 128, 0], [0, 0, 128],
