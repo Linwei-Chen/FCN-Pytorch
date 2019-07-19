@@ -198,12 +198,13 @@ def val(args, model, scheduler, val_loader, logger, model_saver):
     miou = float(miou)
     pixel_accs = float(pixel_accs)
 
-    print(type(ious), type(miou), type(pixel_accs))
+    # print(type(ious), type(miou), type(pixel_accs))
     print(f'ious:{ious}\nmiou:{miou}\npixel_accs:{pixel_accs}')
     epoch_now = scheduler.state_dict()['last_epoch']
-    print("*** epoch{}, pix_acc: {}, meanIoU: {}, IoUs: {}".format(epoch_now, pixel_accs, miou, ious))
+    # print("*** epoch: {}, pix_acc: {}, meanIoU: {}, IoUs: {}".format(epoch_now, pixel_accs, miou, ious))
     if logger.get_max(key='meanIoU') < miou or logger.get_max(key='meanPixel') < pixel_accs:
-        model_saver.save(name=args.model_name + f'_mIU:{miou}_mp:{pixel_accs}', model=model)
+        model_saver.save(name=args.model_name + f'mIU:{miou:.4f}mp:{pixel_accs:.4f}', model=model)
+    # model_saver.save(name=args.model_name + f'_miou_{miou:.4f}_pa_{pixel_accs:.4f}', model=model)
 
     logger.log(key='meanIoU', data=miou, show=True)
     logger.log(key='IoUs', data=ious, show=True)
@@ -237,7 +238,7 @@ if __name__ == "__main__":
     # init the tools
     args = config()
     logger = Logger(save_path=args.save, json_name=args.optimizer)
-    model_saver = ModelSaver(save_path=args.save, name_list=[args.optimizer, args.model_name])
+    model_saver = ModelSaver(save_path=args.save, name_list=[args.optimizer, args.model_name, args.scheduler_name])
 
     # get model
     model = get_model(name=args.model_name, n_class=args.n_class)

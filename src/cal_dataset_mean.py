@@ -7,8 +7,11 @@ from tqdm import tqdm
 VOC2012数据集的BGR平均值为
 [101.88298592833736, 110.06103779748445, 115.40426167733621]
 
-数据集的BGR标准差为:
+VOC2012数据集的BGR标准差为:
 [35.54421759971818, 31.592458778527075, 30.887643371028858]
+
+VOC图片尺寸
+minh:71, minw:142, meanh:389.5076204379562, meanw:466.7975474452555
 
 VOC2007数据集的BGR平均值为:
 [99.95984164295817, 108.37466704041454, 114.37500234701753]
@@ -78,7 +81,7 @@ def cal_imgs_std(imgs_path, BGR_mean):
     B_var = np.sqrt(np.mean(B))
     G_var = np.sqrt(np.mean(G))
     R_var = np.sqrt(np.mean(R))
-    print('数据集的BGR平均值为:\n[{}, {}, {}]'.format(B_var, G_var, R_var))
+    print('数据集的BGR标准差为:\n[{}, {}, {}]'.format(B_var, G_var, R_var))
 
 
 def cal_imgs_size_mean(imgs_path):

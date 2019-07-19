@@ -233,7 +233,7 @@ def get_model(name: str, n_class=21):
 
 
 if __name__ == "__main__":
-    batch_size, n_class, h, w = 10, 20, 160, 160
+    batch_size, n_class, h, w = 10, 20, 320, 320
 
     # test output size
     vgg_model = VGGNet(requires_grad=True)

@@ -145,9 +145,9 @@ class ModelSaver:
         try:
             self.save_safely(model.state_dict(), self.save_path, file_name=name + '.pkl')
         except Exception:
-            print(f'*** Saveing {name} fail!')
+            print(f'*** Saving {name} fail!')
         else:
-            print(f'*** Saveing {name} successfully')
+            print(f'*** Saving {name} successfully')
 
     @staticmethod
     def save_safely(file, dir_path, file_name):

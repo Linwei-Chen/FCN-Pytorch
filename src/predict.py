@@ -6,15 +6,8 @@ from torchvision import transforms
 from train import config, get_device
 from imgs_dir_reader import from_dir_get_imgs_list
 import numbers
-from dataset import CLASSES
+from dataset import CLASSES, COLORMAP, VOC2012_BGR_std, VOC2012_RGB_mean
 from logger import ModelSaver
-
-# RGB color for each class.
-COLORMAP = [[0, 0, 0], [128, 0, 0], [0, 128, 0], [128, 128, 0], [0, 0, 128],
-            [128, 0, 128], [0, 128, 128], [128, 128, 128], [64, 0, 0], [192, 0, 0],
-            [64, 128, 0], [192, 128, 0], [64, 0, 128], [192, 0, 128],
-            [64, 128, 128], [192, 128, 128], [0, 64, 0], [128, 64, 0],
-            [0, 192, 0], [128, 192, 0], [0, 64, 128]]
 
 
 class Predict:
@@ -61,7 +54,11 @@ class Predict:
             resize = (480, 480)
 
         img_resized = img.resize(resize)
-        img_tensor = transforms.ToTensor()(img_resized)
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(mean=VOC2012_RGB_mean, std=VOC2012_BGR_std)
+        ])
+        img_tensor = transform(img_resized)
         return img, img_tensor, (w, h)
 
     def from_pred_to_color_img(self, pred):
@@ -80,9 +77,10 @@ class Predict:
 if __name__ == '__main__':
 
     args = config()
-    model = get_model(name=args.model_name, n_class=args.n_class)
     model_saver = ModelSaver(save_path=args.save, name_list=[args.optimizer, args.model_name])
     # model_saver.load(args.model_name, model)
+    # get model
+    model = get_model(name=args.model_name, n_class=args.n_class)
     model_saver.load(name=args.model_name, model=model)
     predictor = Predict(model)
 
