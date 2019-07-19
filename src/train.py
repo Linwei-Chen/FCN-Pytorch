@@ -15,6 +15,9 @@ from logger import Logger, ModelSaver
 from fcn import get_model
 from dataset import get_voc_data_loader, label_to_one_hot
 from tqdm import tqdm
+from torchvision import transforms
+from torch.nn import functional as F
+
 
 def config():
     parser = argparse.ArgumentParser(description='Trains ResNeXt on CIFAR',
@@ -27,8 +30,8 @@ def config():
     # Optimization options
     parser.add_argument('--optimizer', '-op', type=str, default='Adam', help='Optimizer to train model.')
     parser.add_argument('--epochs', '-e', type=int, default=500, help='Number of epochs to train.')
-    parser.add_argument('--batch_size', '-b', type=int, default=4, help='Batch size.')
-    parser.add_argument('--lr', type=float, default=0.1, help='The Learning Rate.')
+    parser.add_argument('--batch_size', '-b', type=int, default=1, help='Batch size.')
+    parser.add_argument('--lr', type=float, default=0.01, help='The Learning Rate.')
     parser.add_argument('--momentum', '-m', type=float, default=0.9, help='Momentum.')
     parser.add_argument('--decay', '-d', type=float, default=2e-4, help='Weight decay (L2 penalty).')
     parser.add_argument('--test_bs', type=int, default=10)
@@ -38,7 +41,7 @@ def config():
     parser.add_argument('--gamma', type=float, default=0.1, help='LR is multiplied by gamma on schedule.')
     # Checkpoints
     parser.add_argument('--save', '-s', type=str, default=None, help='Folder to save checkpoints.')
-    parser.add_argument('--save_steps', '-ss', type=int, default=100, help='steps to save checkpoints.')
+    parser.add_argument('--save_steps', '-ss', type=int, default=50, help='steps to save checkpoints.')
     parser.add_argument('--load', '-l', type=str, help='Checkpoint path to resume / test.')
     parser.add_argument('--test', '-t', action='store_true', help='Test only flag.')
 
@@ -48,11 +51,12 @@ def config():
 
     # Acceleration
     parser.add_argument('--ngpu', type=int, default=1, help='0 = CPU.')
-    parser.add_argument('--prefetch', type=int, default=12, help='Pre-fetching threads.')
+    parser.add_argument('--prefetch', type=int, default=0, help='Pre-fetching threads.')
     # i/o
     parser.add_argument('--log', type=str, default=None, help='Log folder.')
     args = parser.parse_args()
     args.optimizer = args.optimizer.lower()
+    args.model_name = args.model_name.lower()
     if args.save is None:
         args.save = f'../{args.model_name}_{args.dataset}'
     if args.log is None:
@@ -61,19 +65,6 @@ def config():
     args.scheduler_name = f'{args.optimizer}_scheduler'
     print(args)
     return args
-
-
-# n_class = 20
-# batch_size = 6
-# epochs = 500
-# lr = 1e-4
-# momentum = 0
-# w_decay = 1e-5
-# step_size = 50
-# gamma = 0.5
-# configs = "FCNs-BCEWithLogits_batch{}_epoch{}_RMSprop_scheduler-step{}-gamma{}_lr{}_momentum{}_w_decay{}".format(
-#     batch_size, epochs, step_size, gamma, lr, momentum, w_decay)
-# print("Configs:", configs)
 
 
 def get_device(args):
@@ -104,22 +95,64 @@ def get_lr(optimizer):
         return param_group['lr']
 
 
+def from_pre_to_img(t):
+    """
+
+    :param t: tensor of [1, 21, h, w]
+    :return:
+    """
+    from dataset import COLORMAP
+    cm = torch.Tensor(COLORMAP)
+    t = t.cpu()
+    t = t.argmax(dim=1, keepdim=True)
+    t = t[0].squeeze()
+    h, w = t.size()
+    temp = torch.zeros((3, h, w))
+    for i in range(h):
+        for j in range(w):
+            temp[:, i, j] = cm[t[i, j]]
+    res = transforms.ToPILImage()(temp / 255.0)
+    res.show()
+    return res
+
+
 # train function (forward, backward, update)
 def train_one_epoch(args, model, optimizer, train_loader, logger, model_saver):
     criterion = nn.BCEWithLogitsLoss()
+    # criterion = nn.BCELoss()
+    # criterion = nn.CrossEntropyLoss()
     model.train()
     device = get_device(args)
     for step, (imgs, targets) in enumerate(train_loader, start=1):
         t1 = time.perf_counter()
         optimizer.zero_grad()
         targets_one_hot = label_to_one_hot(targets, n_class=args.n_class)
+
+        # test
+        # targets_one_hot_argmax = targets_one_hot.argmax(dim=1, keepdim=True)
+        # print(f'targets_one_hot_argmax:{targets_one_hot_argmax}\ntargets:{targets}')
+        # print(f'check:{torch.eq(targets, targets_one_hot_argmax)}')
+
         imgs, targets_one_hot = imgs.to(device), targets_one_hot.to(device)
         outs = model(imgs)
+        # outs = model(imgs).sigmoid()
+        # outs = model(imgs).softmax(dim=1)
+
+        # from_pre_to_img(outs)
+
+        # print(f'outs:{outs}\ntargets:{targets_one_hot}')
+        # outs = outs.transpose(1, 2)
+        # outs = outs.transpose(2, 3)
+        # outs = outs.contiguous()
+
+        # outs = outs.view(-1, args.n_class).contiguous()
+        # targets = targets.squeeze(dim=0).view(-1).contiguous()
         loss = criterion(input=outs, target=targets_one_hot)
         loss.backward()
         optimizer.step()
         t2 = time.perf_counter()
-        print(f'step:{step} | loss:{loss.item():.8f} | lr:{get_lr(optimizer)} | time:{t2 - t1}')
+        print(f'step:{step} [{step}/{len(train_loader)}] '
+              f'| loss:{loss.item():.8f} | lr:{get_lr(optimizer)} | time:{t2 - t1}')
         logger.log(key='train_loss', data=loss.item())
         # save the model, optimizer every args.save_steps
         if step % args.save_steps == 0:
@@ -156,13 +189,22 @@ def val(args, model, scheduler, val_loader, logger, model_saver):
 
     # Calculate average IoU
     total_ious = np.array(total_ious).T  # n_class * val_len
-    ious = np.nanmean(total_ious, axis=1)
+
+    ious = np.nanmean(total_ious, axis=1)  # list
     miou = np.nanmean(ious)
     pixel_accs = np.array(pixel_accs).mean()
+
+    ious = list(ious)  # list
+    miou = float(miou)
+    pixel_accs = float(pixel_accs)
+
+    print(type(ious), type(miou), type(pixel_accs))
+    print(f'ious:{ious}\nmiou:{miou}\npixel_accs:{pixel_accs}')
     epoch_now = scheduler.state_dict()['last_epoch']
     print("*** epoch{}, pix_acc: {}, meanIoU: {}, IoUs: {}".format(epoch_now, pixel_accs, miou, ious))
     if logger.get_max(key='meanIoU') < miou or logger.get_max(key='meanPixel') < pixel_accs:
-        model_saver.save(name=args.model_name + f'_mIU:{ious}_mp:{pixel_accs}', model=model)
+        model_saver.save(name=args.model_name + f'_mIU:{miou}_mp:{pixel_accs}', model=model)
+
     logger.log(key='meanIoU', data=miou, show=True)
     logger.log(key='IoUs', data=ious, show=True)
     logger.log(key='meanPixel', data=pixel_accs, show=True)
@@ -201,16 +243,16 @@ if __name__ == "__main__":
     model = get_model(name=args.model_name, n_class=args.n_class)
     model_saver.load(name=args.model_name, model=model)
 
-    # get optimizer
-    optimizer = get_optimizer(args, name=args.optimizer, model=model)
-    model_saver.load(name=args.optimizer, model=optimizer)
-
     # Accelerate the model training
     device = get_device(args)
     model = model.to(device)
 
+    # get optimizer
+    optimizer = get_optimizer(args, name=args.optimizer, model=model)
+    model_saver.load(name=args.optimizer, model=optimizer)
+
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=args.schedule, gamma=args.gamma)
-    model_saver.load(name=args.scheduler_name , model=scheduler)
+    model_saver.load(name=args.scheduler_name, model=scheduler)
 
     # Main loop
     for _ in range(args.epochs):
@@ -229,6 +271,8 @@ if __name__ == "__main__":
         train_one_epoch(args, model, optimizer, train_loader, logger, model_saver)
         val(args, model, scheduler, val_loader, logger, model_saver)
 
-        model_saver.save(name=args.scheduler_name , model=scheduler)
+        model_saver.save(name=args.model_name, model=model)
+        model_saver.save(name=args.optimizer, model=optimizer)
+        model_saver.save(name=args.scheduler_name, model=scheduler)
         logger.save_log()
         logger.visualize()

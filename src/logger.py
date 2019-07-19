@@ -47,7 +47,7 @@ class Logger:
             return max(self.state[key])
         except Exception:
             print(f'sorry, cannot get the max of data {key}')
-            return None
+            return float('-inf')
 
     def log(self, key, data, show=False):
         if key not in self.state:

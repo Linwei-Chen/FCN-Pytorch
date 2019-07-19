@@ -10,12 +10,12 @@ import torch
 import numpy as np
 import torchvision.transforms.functional as F
 
-CROP_SIZE = 128
+CROP_SIZE = 224
 
 CLASSES = ['background',
            'aeroplane', 'bicycle', 'bird', 'boat', 'bottle',
            'bus', 'car', 'cat', 'chair', 'cow',
-           'diningtable', 'dog', 'horse', 'motorbike','person',
+           'diningtable', 'dog', 'horse', 'motorbike', 'person',
            'potted plant', 'sheep', 'sofa', 'train', 'tv/monitor']
 
 # RGB color for each class.
@@ -24,6 +24,9 @@ COLORMAP = [[0, 0, 0], [128, 0, 0], [0, 128, 0], [128, 128, 0], [0, 0, 128],
             [64, 128, 0], [192, 128, 0], [64, 0, 128], [192, 0, 128],
             [64, 128, 128], [192, 128, 128], [0, 64, 0], [128, 64, 0],
             [0, 192, 0], [128, 192, 0], [0, 64, 128]]
+
+VOC2012_RGB_mean = [x / 255.0 for x in [115.40426167733621, 110.06103779748445, 101.88298592833736]]
+VOC2012_BGR_std = [x / 255.0 for x in [30.887643371028858, 31.592458778527075, 35.54421759971818]]
 
 
 def image2label(img):
@@ -54,8 +57,7 @@ class Compose2(object):
 
     def __call__(self, img, target):
         for t in self.transforms:
-            img = t(img)
-            target = t(target)
+            img, target = t(img, target)
         return img, target
 
     def __repr__(self):
@@ -71,7 +73,7 @@ class to_tensor(object):
     def __init__(self):
         pass
 
-    def __call__(self, input):
+    def __call__(self, img, target):
         """
 
         :param input: tensor
@@ -80,22 +82,151 @@ class to_tensor(object):
         """
         # print(len(img.mode))
         # if input is img
-        if len(input.mode) == 3:
-            return transforms.ToTensor()(input)
-        # if img is target
+        # if len(input.mode) == 3:
+
+        # for img
+        img = transforms.ToTensor()(img)
+        # for target
+        target = torch.from_numpy(np.array(target)).long()
+        # print(target.type())
+        zeros = torch.zeros(target.shape).long()
+        # del 255.
+        target = torch.where(target <= 20, target, zeros)
+        target = target.unsqueeze(dim=0)
+        return img, target
+
+
+class RandomCrop(object):
+    """Crop the given PIL Image at a random location.
+
+    Args:
+        size (sequence or int): Desired output size of the crop. If size is an
+            int instead of sequence like (h, w), a square crop (size, size) is
+            made.
+        padding (int or sequence, optional): Optional padding on each border
+            of the image. Default is 0, i.e no padding. If a sequence of length
+            4 is provided, it is used to pad left, top, right, bottom borders
+            respectively.
+        pad_if_needed (boolean): It will pad the image if smaller than the
+            desired size to avoid raising an exception.
+    """
+
+    def __init__(self, size, padding=0, pad_if_needed=False):
+        if isinstance(size, numbers.Number):
+            self.size = (int(size), int(size))
         else:
-            target = torch.from_numpy(np.array(input)).long()
-            # print(target.type())
-            zeros = torch.zeros(target.shape).long()
-            # del 255
-            target = torch.where(target <= 20, target, zeros)
-            target = target.unsqueeze(dim=0)
-            return target
+            self.size = size
+        self.padding = padding
+        self.pad_if_needed = pad_if_needed
+
+    @staticmethod
+    def get_params(img, output_size):
+        """Get parameters for ``crop`` for a random crop.
+
+        Args:
+            img (PIL Image): Image to be cropped.
+            output_size (tuple): Expected output size of the crop.
+
+        Returns:
+            tuple: params (i, j, h, w) to be passed to ``crop`` for random crop.
+        """
+        w, h = img.size
+        th, tw = output_size
+        if w == tw and h == th:
+            return 0, 0, h, w
+
+        i = random.randint(0, h - th)
+        j = random.randint(0, w - tw)
+        return i, j, th, tw
+
+    def __call__(self, img, target):
+        """
+        Args:
+            img (PIL Image): Image to be cropped.
+
+        Returns:
+            PIL Image: Cropped image.
+        """
+        if self.padding > 0:
+            img = F.pad(img, self.padding)
+            target = F.pad(target, self.padding)
+
+        # pad the width if needed
+        if self.pad_if_needed and img.size[0] < self.size[1]:
+            img = F.pad(img, (int((1 + self.size[1] - img.size[0]) / 2), 0))
+            target = F.pad(target, (int((1 + self.size[1] - target.size[0]) / 2), 0))
+        # pad the height if needed
+        if self.pad_if_needed and img.size[1] < self.size[0]:
+            img = F.pad(img, (0, int((1 + self.size[0] - img.size[1]) / 2)))
+            target = F.pad(target, (0, int((1 + self.size[0] - target.size[1]) / 2)))
+
+        i, j, h, w = self.get_params(img, self.size)
+
+        return F.crop(img, i, j, h, w), F.crop(target, i, j, h, w)
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(size={0}, padding={1})'.format(self.size, self.padding)
 
 
-voc_transform = Compose2([transforms.RandomHorizontalFlip(p=0.5),
-                          transforms.RandomCrop(size=CROP_SIZE, pad_if_needed=True),
-                          to_tensor()])
+class RandomHorizontalFlip(object):
+    """Horizontally flip the given PIL Image randomly with a given probability.
+
+    Args:
+        p (float): probability of the image being flipped. Default value is 0.5
+    """
+
+    def __init__(self, p=0.5):
+        self.p = p
+
+    def __call__(self, img, target):
+        """
+        Args:
+            img (PIL Image): Image to be flipped.
+
+        Returns:
+            PIL Image: Randomly flipped image.
+        """
+        if random.random() < self.p:
+            return F.hflip(img), F.hflip(target)
+        # img.show(), target.show()
+        return img, target
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(p={})'.format(self.p)
+
+
+class Normalize(object):
+    """Normalize a tensor image with mean and standard deviation.
+    Given mean: ``(M1,...,Mn)`` and std: ``(S1,..,Sn)`` for ``n`` channels, this transform
+    will normalize each channel of the input ``torch.*Tensor`` i.e.
+    ``input[channel] = (input[channel] - mean[channel]) / std[channel]``
+
+    Args:
+        mean (sequence): Sequence of means for each channel.
+        std (sequence): Sequence of standard deviations for each channel.
+    """
+
+    def __init__(self, mean, std):
+        self.mean = mean
+        self.std = std
+
+    def __call__(self, img_tensor, target):
+        """
+        Args:
+            tensor (Tensor): Tensor image of size (C, H, W) to be normalized.
+
+        Returns:
+            Tensor: Normalized Tensor image.
+        """
+        return F.normalize(img_tensor, self.mean, self.std), target
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(mean={0}, std={1})'.format(self.mean, self.std)
+
+
+voc_transform = Compose2([RandomCrop(size=CROP_SIZE, pad_if_needed=True),
+                                RandomHorizontalFlip(p=0.5),
+                                to_tensor(), Normalize(VOC2012_RGB_mean, VOC2012_BGR_std)])
 
 
 def get_voc_data_loader(args, train=True):
@@ -158,6 +289,7 @@ def dataset_test():
     for _, (imgs, targets) in enumerate(dataset):
         optimizer.zero_grad()
         print(imgs.size(), targets.size())
+        print(f'imgs:{imgs}\ntargets:{targets}')
         # targets = targets.copy_()
         # for i in targets.view(-1): print(i)
         outs = model(imgs)
@@ -167,11 +299,19 @@ def dataset_test():
         print(f'targets_one_hot_argmax:{targets_one_hot_argmax}\ntargets:{targets}')
         print(f'check:{torch.eq(targets, targets_one_hot_argmax)}')
         # print(outs.type(), targets_one_hot.type())
+
+        BCEWithLogitsLoss_check = nn.BCEWithLogitsLoss()(input=targets_one_hot * 1000, target=targets_one_hot)
+        # BCEWithLogitsLoss_check = nn.BCELoss()(input=targets_one_hot, target=targets_one_hot)
+        print(f'BCEWithLogitsLoss_check:{BCEWithLogitsLoss_check}')
+
         loss = criterion(outs, targets_one_hot)
         loss.backward()
         print(f'loss:{loss.item()}')
-        loss_for_check = nn.CrossEntropyLoss()(targets_one_hot.reshape(1, 21, -1), targets.reshape(1, -1))
-        print(loss_for_check.item())
+        loss_for_check = nn.CrossEntropyLoss()(targets_one_hot.reshape(1, 21, -1) * 10000, targets.reshape(1, -1))
+        print(f'loss_for_check:{loss_for_check.item()}')
+        zero_entropy = nn.CrossEntropyLoss()(torch.Tensor([[1000, 0, 0], [10000, 0, 0], [10000, 0, 0]]).float(),
+                                             torch.Tensor([0, 0, 0]).long())
+        print(f'zero_entropy:{zero_entropy}')
         optimizer.step()
         pass
 
