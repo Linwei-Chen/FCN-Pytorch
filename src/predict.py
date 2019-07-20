@@ -8,15 +8,17 @@ from imgs_dir_reader import from_dir_get_imgs_list
 import numbers
 from dataset import CLASSES, COLORMAP, VOC2012_BGR_std, VOC2012_RGB_mean
 from logger import ModelSaver
+import math
 
 
 class Predict:
-    def __init__(self, model, cuda=False):
+    def __init__(self, model, stride=32., cuda=False):
         self.model = model
         self.model.eval()
         self.device = torch.device('cuda' if torch.cuda.is_available() and cuda else 'cpu')
         self.model = self.model.to(self.device)
         self.color_map = torch.Tensor(COLORMAP)
+        self.stride = stride
 
     def predict_one_img(self, img_path, resize=None):
         img, img_tensor, (w, h) = self.from_PIL_path_to_Tensor(img_path, resize)
@@ -41,17 +43,18 @@ class Predict:
         merge_img = self.merge_two_img(img, pred_img)
         merge_img.show()
 
-    @staticmethod
-    def from_PIL_path_to_Tensor(img_path, resize):
+    def from_PIL_path_to_Tensor(self, img_path, resize):
         img = Image.open(img_path)
         w, h = img.size
+
         if resize is not None:
             assert isinstance(resize, numbers.Number) or (isinstance(resize, tuple) and len(resize) == 2)
 
             if isinstance(resize, numbers.Number):
                 resize = (resize, resize)
         else:
-            resize = (480, 480)
+            w_stride, h_stride = math.ceil(w / self.stride), math.ceil(h / self.stride)
+            resize = (int(w_stride * self.stride), int(h_stride * self.stride))
 
         img_resized = img.resize(resize)
         transform = transforms.Compose([
@@ -63,10 +66,16 @@ class Predict:
 
     def from_pred_to_color_img(self, pred):
         h, w = pred.size()
+        # pred = pred.expand(3, -1, -1)
         temp = torch.zeros((3, h, w))
-        for i in range(h):
-            for j in range(w):
-                temp[:, i, j] = self.color_map[pred[i, j]]
+        for channel in range(3):
+            for color in range(len(self.color_map)):
+                temp[channel][pred == color] = self.color_map[color][channel]
+
+        # another way of coloring the img
+        # for i in range(h):
+        #     for j in range(w):
+        #         temp[:, i, j] = self.color_map[pred[i, j]]
         return transforms.ToPILImage()(temp / 255.0)
 
     @staticmethod

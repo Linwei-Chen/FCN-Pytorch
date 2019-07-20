@@ -9,8 +9,9 @@ import random
 import torch
 import numpy as np
 import torchvision.transforms.functional as F
+import math
 
-CROP_SIZE =320
+CROP_SIZE = 320
 
 CLASSES = ['background',
            'aeroplane', 'bicycle', 'bird', 'boat', 'bottle',
@@ -67,33 +68,6 @@ class Compose2(object):
             format_string += '    {0}'.format(t)
         format_string += '\n)'
         return format_string
-
-
-class to_tensor(object):
-    def __init__(self):
-        pass
-
-    def __call__(self, img, target):
-        """
-
-        :param input: tensor
-        :return: if input is image return tensor[bs, 3, h, w],
-        else if input is segment targets, return tensor[bs, 1, h, w]
-        """
-        # print(len(img.mode))
-        # if input is img
-        # if len(input.mode) == 3:
-
-        # for img
-        img = transforms.ToTensor()(img)
-        # for target
-        target = torch.from_numpy(np.array(target)).long()
-        # print(target.type())
-        zeros = torch.zeros(target.shape).long()
-        # del 255.
-        target = torch.where(target <= 20, target, zeros)
-        target = target.unsqueeze(dim=0)
-        return img, target
 
 
 class RandomCrop(object):
@@ -224,19 +198,71 @@ class Normalize(object):
         return self.__class__.__name__ + '(mean={0}, std={1})'.format(self.mean, self.std)
 
 
-voc_transform = Compose2([RandomCrop(size=CROP_SIZE, pad_if_needed=True),
+class to_tensor(object):
+    def __init__(self):
+        pass
+
+    def __call__(self, img, target):
+        """
+
+        :param input: tensor
+        :return: if input is image return tensor[bs, 3, h, w],
+        else if input is segment targets, return tensor[bs, 1, h, w]
+        """
+        # print(len(img.mode))
+        # if input is img
+        # if len(input.mode) == 3:
+
+        # for img
+        img = transforms.ToTensor()(img)
+        # for target
+        target = torch.from_numpy(np.array(target)).long()
+        # print(target.type())
+        zeros = torch.zeros(target.shape).long()
+        # del 255.
+        target = torch.where(target <= 20, target, zeros)
+        target = target.unsqueeze(dim=0)
+        return img, target
+
+
+class CenterCrop(object):
+    """Crops the given PIL Image at the center.
+
+    Args:
+        size (sequence or int): Desired output size of the crop. If size is an
+            int instead of sequence like (h, w), a square crop (size, size) is
+            made.
+    """
+
+    def __init__(self, stride=32.):
+        self.stride = 32.
+
+    def __call__(self, img, target):
+        """
+        Args:
+            img (PIL Image): Image to be cropped.
+
+        Returns:
+            PIL Image: Cropped image.
+        """
+        w, h = img.size
+        w_stride, h_stride = math.floor(w / self.stride), math.floor(h / self.stride)
+        resize = (int(w_stride * self.stride), int(h_stride * self.stride))
+        return F.center_crop(img, resize), F.center_crop(target, resize)
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(size={0})'.format(self.size)
+
+
+voc_train_transform = Compose2([RandomCrop(size=CROP_SIZE, pad_if_needed=True),
                                 RandomHorizontalFlip(p=0.5),
                                 to_tensor(), Normalize(VOC2012_RGB_mean, VOC2012_BGR_std)])
 
+voc_val_transform = Compose2([CenterCrop(stride=32.),
+                              to_tensor(), Normalize(VOC2012_RGB_mean, VOC2012_BGR_std)])
+
 
 def get_voc_data_loader(args, train=True):
-    voc_dataset = datasets.VOCSegmentation(root=args.data_path,
-                                           year=args.dataset,
-                                           image_set='train' if train else 'val',
-                                           download=False,
-                                           transform=None,
-                                           target_transform=None,
-                                           transforms=voc_transform)
     """`Pascal VOC <http://host.robots.ox.ac.uk/pascal/VOC/>`_ Segmentation Dataset.
 
         Args:
@@ -250,17 +276,38 @@ def get_voc_data_loader(args, train=True):
                 and returns a transformed version. E.g, ``transforms.RandomCrop``
             target_transform (callable, optional): A function/transform that takes in the
                 target and transforms it.
-        """
-    return DataLoader(dataset=voc_dataset,
-                      batch_size=args.batch_size,
-                      shuffle=args.shuffle,
-                      num_workers=args.prefetch,
-                      pin_memory=True)
+    """
+    if train:
+        voc_train_dataset = datasets.VOCSegmentation(root=args.data_path,
+                                                     year=args.dataset,
+                                                     image_set='trainval',
+                                                     download=False,
+                                                     transform=None,
+                                                     target_transform=None,
+                                                     transforms=voc_train_transform)
+        return DataLoader(dataset=voc_train_dataset,
+                          batch_size=args.batch_size,
+                          shuffle=args.shuffle,
+                          num_workers=args.prefetch,
+                          pin_memory=True)
+    else:
+        voc_val_dataset = datasets.VOCSegmentation(root=args.data_path,
+                                                   year=args.dataset,
+                                                   image_set='val',
+                                                   download=False,
+                                                   transform=None,
+                                                   target_transform=None,
+                                                   transforms=voc_val_transform)
+        return DataLoader(dataset=voc_val_dataset,
+                          batch_size=1,
+                          shuffle=False,
+                          num_workers=args.prefetch,
+                          pin_memory=True)
 
 
 def label_to_one_hot(targets, n_class):
     """
-
+    get one-hot tensor from targets
     :param targets: long tensor[bs, 1, h, w]
     :param nlabels: int
     :return: float tensor [bs, nlabel, h, w]

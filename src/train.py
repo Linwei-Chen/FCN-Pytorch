@@ -128,25 +128,13 @@ def train_one_epoch(args, model, optimizer, train_loader, logger, model_saver):
         optimizer.zero_grad()
         targets_one_hot = label_to_one_hot(targets, n_class=args.n_class)
 
-        # test
+        # test the one-hot transform
         # targets_one_hot_argmax = targets_one_hot.argmax(dim=1, keepdim=True)
         # print(f'targets_one_hot_argmax:{targets_one_hot_argmax}\ntargets:{targets}')
         # print(f'check:{torch.eq(targets, targets_one_hot_argmax)}')
 
         imgs, targets_one_hot = imgs.to(device), targets_one_hot.to(device)
         outs = model(imgs)
-        # outs = model(imgs).sigmoid()
-        # outs = model(imgs).softmax(dim=1)
-
-        # from_pre_to_img(outs)
-
-        # print(f'outs:{outs}\ntargets:{targets_one_hot}')
-        # outs = outs.transpose(1, 2)
-        # outs = outs.transpose(2, 3)
-        # outs = outs.contiguous()
-
-        # outs = outs.view(-1, args.n_class).contiguous()
-        # targets = targets.squeeze(dim=0).view(-1).contiguous()
         loss = criterion(input=outs, target=targets_one_hot)
         loss.backward()
         optimizer.step()
@@ -154,6 +142,7 @@ def train_one_epoch(args, model, optimizer, train_loader, logger, model_saver):
         print(f'step:{step} [{step}/{len(train_loader)}] '
               f'| loss:{loss.item():.8f} | lr:{get_lr(optimizer)} | time:{t2 - t1}')
         logger.log(key='train_loss', data=loss.item())
+
         # save the model, optimizer every args.save_steps
         if step % args.save_steps == 0:
             logger.visualize(key='train_loss', range=(-1000, -1))
@@ -169,7 +158,7 @@ def val(args, model, scheduler, val_loader, logger, model_saver):
     total_ious = []
     pixel_accs = []
     for step, (imgs, targets) in enumerate(val_loader):
-        print(f'***processing : {step}/{len(val_loader)}')
+        print(f'*** processing : {step}/{len(val_loader)}')
         imgs = imgs.to(device)
         # targets_one_hot = label_to_one_hot(targets, n_class=args.n_class)
         # targets_one_hot = targets_one_hot.to(device)
@@ -203,10 +192,7 @@ def val(args, model, scheduler, val_loader, logger, model_saver):
     epoch_now = scheduler.state_dict()['last_epoch']
     # print("*** epoch: {}, pix_acc: {}, meanIoU: {}, IoUs: {}".format(epoch_now, pixel_accs, miou, ious))
     if logger.get_max(key='meanIoU') < miou or logger.get_max(key='meanPixel') < pixel_accs:
-        # model_saver.save(name=args.model_name + f'mIU:{miou:.4f}mp:{pixel_accs:.4f}', model=model)
         model_saver.save(name=args.model_name + f'_miou_{miou:.4f}_pa_{pixel_accs:.4f}', model=model)
-    # model_saver.save(name=args.model_name + f'mIU:{miou:.4f}mp:{pixel_accs:.4f}', model=model)
-    # model_saver.save(name=args.model_name + f'_miou_{miou:.4f}_pa_{pixel_accs:.4f}', model=model)
 
     logger.log(key='meanIoU', data=miou, show=True)
     logger.log(key='IoUs', data=ious, show=True)
@@ -217,12 +203,12 @@ def val(args, model, scheduler, val_loader, logger, model_saver):
 # Calculates class intersections over unions
 def iou(args, pred, target):
     ious = []
-    for cls in range(args.n_class):
-        pred_inds = pred == cls
+    for cls in range(1, args.n_class):
+        pred_inds = pred == cls  # true, false matrix
         target_inds = target == cls
         intersection = pred_inds[target_inds].sum()
         union = pred_inds.sum() + target_inds.sum() - intersection
-        if union == 0:
+        if target_inds.sum() == 0:
             ious.append(float('nan'))  # if there is no ground truth, do not include in evaluation
         else:
             ious.append(float(intersection) / max(union, 1))

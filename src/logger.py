@@ -9,6 +9,7 @@ ModelSaver is design to save the state_dict of model, optimizer, scheduler etc s
 Author: Charles Chen
 """
 
+
 class Logger:
     def __init__(self, save_path, json_name):
         self.create_dir(save_path)
@@ -128,28 +129,35 @@ class Logger:
 
 
 class ModelSaver:
-    def __init__(self, save_path, name_list):
+    def __init__(self, save_path, name_list, strict_mode=False):
         self.create_dir(save_path)
         self.save_path = save_path
         self.name_dict = {name: osp.join(save_path, name + '.pkl') for name in name_list}
+        self.strict_mode = strict_mode
 
     def load(self, name, model):
-        model.load_state_dict(torch.load(self.name_dict[name], map_location='cpu'))
-        # try:
-        #     model.load_state_dict(torch.load(self.name_dict[name]))
-        # except Exception:
-        #     print(f'*** Loading {name} fail!')
-        # else:
-        #     print(f'*** Loading {name} successfully')
+        if self.strict_mode:
+            model.load_state_dict(torch.load(self.name_dict[name], map_location='cpu'))
+            print(f'*** Loading {name} successfully')
+        else:
+            try:
+                model.load_state_dict(torch.load(self.name_dict[name]))
+            except Exception:
+                print(f'*** Loading {name} fail!')
+            else:
+                print(f'*** Loading {name} successfully')
 
     def save(self, name, model):
-        self.save_safely(model.state_dict(), self.save_path, file_name=name + '.pkl')
-        # try:
-        #     self.save_safely(model.state_dict(), self.save_path, file_name=name + '.pkl')
-        # except Exception:
-        #     print(f'*** Saving {name} fail!')
-        # else:
-        #     print(f'*** Saving {name} successfully')
+        if self.strict_mode:
+            self.save_safely(model.state_dict(), self.save_path, file_name=name + '.pkl')
+            print(f'*** Saving {name} successfully')
+        else:
+            try:
+                self.save_safely(model.state_dict(), self.save_path, file_name=name + '.pkl')
+            except Exception:
+                print(f'*** Saving {name} fail!')
+            else:
+                print(f'*** Saving {name} successfully')
 
     @staticmethod
     def save_safely(file, dir_path, file_name):

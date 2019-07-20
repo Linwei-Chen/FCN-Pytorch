@@ -233,7 +233,7 @@ def get_model(name: str, n_class=21):
 
 
 if __name__ == "__main__":
-    batch_size, n_class, h, w = 10, 20, 320, 320
+    batch_size, n_class, h, w = 1, 20, 63, 63
 
     # test output size
     vgg_model = VGGNet(requires_grad=True)
@@ -244,21 +244,25 @@ if __name__ == "__main__":
     fcn_model = FCN32s(pretrained_net=vgg_model, n_class=n_class)
     input = torch.randn(batch_size, 3, h, w)
     output = fcn_model(input)
+    print(f'output size:{output.size()}')
     assert output.size() == torch.Size([batch_size, n_class, h, w])
 
     fcn_model = FCN16s(pretrained_net=vgg_model, n_class=n_class)
     input = torch.randn(batch_size, 3, h, w)
     output = fcn_model(input)
+    print(f'output size:{output.size()}')
     assert output.size() == torch.Size([batch_size, n_class, h, w])
 
     fcn_model = FCN8s(pretrained_net=vgg_model, n_class=n_class)
     input = torch.randn(batch_size, 3, h, w)
     output = fcn_model(input)
+    print(f'output size:{output.size()}')
     assert output.size() == torch.Size([batch_size, n_class, h, w])
 
     fcn_model = FCNs(pretrained_net=vgg_model, n_class=n_class)
     input = torch.randn(batch_size, 3, h, w)
     output = fcn_model(input)
+    print(f'output size:{output.size()}')
     assert output.size() == torch.Size([batch_size, n_class, h, w])
 
     print("Pass size check")
