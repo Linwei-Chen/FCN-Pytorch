@@ -134,20 +134,22 @@ class ModelSaver:
         self.name_dict = {name: osp.join(save_path, name + '.pkl') for name in name_list}
 
     def load(self, name, model):
-        try:
-            model.load_state_dict(torch.load(self.name_dict[name]))
-        except Exception:
-            print(f'*** Loading {name} fail!')
-        else:
-            print(f'*** Loading {name} successfully')
+        model.load_state_dict(torch.load(self.name_dict[name], map_location='cpu'))
+        # try:
+        #     model.load_state_dict(torch.load(self.name_dict[name]))
+        # except Exception:
+        #     print(f'*** Loading {name} fail!')
+        # else:
+        #     print(f'*** Loading {name} successfully')
 
     def save(self, name, model):
-        try:
-            self.save_safely(model.state_dict(), self.save_path, file_name=name + '.pkl')
-        except Exception:
-            print(f'*** Saving {name} fail!')
-        else:
-            print(f'*** Saving {name} successfully')
+        self.save_safely(model.state_dict(), self.save_path, file_name=name + '.pkl')
+        # try:
+        #     self.save_safely(model.state_dict(), self.save_path, file_name=name + '.pkl')
+        # except Exception:
+        #     print(f'*** Saving {name} fail!')
+        # else:
+        #     print(f'*** Saving {name} successfully')
 
     @staticmethod
     def save_safely(file, dir_path, file_name):

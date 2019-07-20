@@ -46,7 +46,7 @@ def config():
     parser.add_argument('--test', '-t', action='store_true', help='Test only flag.')
 
     # Architecture
-    parser.add_argument('--model_name', type=str, default='fcn8s', help='choose from fcn32s，16s, 8s, s.')
+    parser.add_argument('--model_name', type=str, default='fcn32s', help='choose from fcn32s，16s, 8s, s.')
     parser.add_argument('--n_class', type=int, default=21, help='classes number to classify.')
 
     # Acceleration
@@ -203,7 +203,9 @@ def val(args, model, scheduler, val_loader, logger, model_saver):
     epoch_now = scheduler.state_dict()['last_epoch']
     # print("*** epoch: {}, pix_acc: {}, meanIoU: {}, IoUs: {}".format(epoch_now, pixel_accs, miou, ious))
     if logger.get_max(key='meanIoU') < miou or logger.get_max(key='meanPixel') < pixel_accs:
-        model_saver.save(name=args.model_name + f'mIU:{miou:.4f}mp:{pixel_accs:.4f}', model=model)
+        # model_saver.save(name=args.model_name + f'mIU:{miou:.4f}mp:{pixel_accs:.4f}', model=model)
+        model_saver.save(name=args.model_name + f'_miou_{miou:.4f}_pa_{pixel_accs:.4f}', model=model)
+    # model_saver.save(name=args.model_name + f'mIU:{miou:.4f}mp:{pixel_accs:.4f}', model=model)
     # model_saver.save(name=args.model_name + f'_miou_{miou:.4f}_pa_{pixel_accs:.4f}', model=model)
 
     logger.log(key='meanIoU', data=miou, show=True)

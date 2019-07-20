@@ -10,7 +10,7 @@ import torch
 import numpy as np
 import torchvision.transforms.functional as F
 
-CROP_SIZE = 224
+CROP_SIZE =320
 
 CLASSES = ['background',
            'aeroplane', 'bicycle', 'bird', 'boat', 'bottle',
