@@ -141,7 +141,7 @@ class ModelSaver:
             print(f'*** Loading {name} successfully')
         else:
             try:
-                model.load_state_dict(torch.load(self.name_dict[name]))
+                model.load_state_dict(torch.load(self.name_dict[name], map_location='cpu'))
             except Exception:
                 print(f'*** Loading {name} fail!')
             else:
