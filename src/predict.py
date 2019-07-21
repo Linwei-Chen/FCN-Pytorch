@@ -1,12 +1,11 @@
-from train import config
-from fcn import get_model
+from model.fcn import get_model
 import torch
 from PIL import Image
 from torchvision import transforms
-from train import config, get_device
+from train import config
 from imgs_dir_reader import from_dir_get_imgs_list
 import numbers
-from dataset import CLASSES, COLORMAP, VOC2012_BGR_std, VOC2012_RGB_mean
+from dataset.voc_dataset import COLORMAP, VOC2012_RGB_std, VOC2012_RGB_mean
 from logger import ModelSaver
 import math
 
@@ -59,7 +58,7 @@ class Predict:
         img_resized = img.resize(resize)
         transform = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Normalize(mean=VOC2012_RGB_mean, std=VOC2012_BGR_std)
+            transforms.Normalize(mean=VOC2012_RGB_mean, std=VOC2012_RGB_std)
         ])
         img_tensor = transform(img_resized)
         return img, img_tensor, (w, h)

@@ -8,25 +8,24 @@ import torch.optim as optim
 
 import numpy as np
 import time
-import sys
-import os
 import argparse
 from logger import Logger, ModelSaver
-from fcn import get_model
-from dataset import get_voc_data_loader, label_to_one_hot
-from tqdm import tqdm
+from model.fcn import get_model
+from dataset.voc_dataset import get_voc_data_loader, label_to_one_hot
 from torchvision import transforms
-from torch.nn import functional as F
+from dataset.sbd_dataset import get_sbd_data_loader
 
 
 def config():
     parser = argparse.ArgumentParser(description='Trains ResNeXt on CIFAR',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     # Positional arguments
-    parser.add_argument('--data_path', type=str, default='/Users/chenlinwei/dataset',
+    parser.add_argument('--voc_data_path', type=str, default='/Users/chenlinwei/dataset',
                         help='Root for the voc dataset.')
-    parser.add_argument('--dataset', type=str, default='2012',
-                        choices=['2007', '2012'], help='Choose between voc2007/2012.')
+    parser.add_argument('--sbd_data_path', type=str, default='/Users/chenlinwei/dataset/SBD/benchmark_RELEASE/dataset',
+                        help='Root for the voc dataset.')
+    parser.add_argument('--crop_size', type=int, default=320, help='Choose crop size of RandomCrop.')
+    parser.add_argument('--stride', type=int, default=32, help='the stride of CNN model.')
     # Optimization options
     parser.add_argument('--optimizer', '-op', type=str, default='Adam', help='Optimizer to train model.')
     parser.add_argument('--epochs', '-e', type=int, default=500, help='Number of epochs to train.')
@@ -58,9 +57,9 @@ def config():
     args.optimizer = args.optimizer.lower()
     args.model_name = args.model_name.lower()
     if args.save is None:
-        args.save = f'../{args.model_name}_{args.dataset}'
+        args.save = f'../{args.model_name}'
     if args.log is None:
-        args.log = f'../{args.model_name}_{args.dataset}'
+        args.log = f'../{args.model_name}'
 
     args.scheduler_name = f'{args.optimizer}_scheduler'
     print(args)
@@ -101,7 +100,7 @@ def from_pre_to_img(t):
     :param t: tensor of [1, 21, h, w]
     :return:
     """
-    from dataset import COLORMAP
+    from dataset.voc_dataset import COLORMAP
     cm = torch.Tensor(COLORMAP)
     t = t.cpu()
     t = t.argmax(dim=1, keepdim=True)
@@ -246,8 +245,9 @@ if __name__ == "__main__":
     # Main loop
     for _ in range(args.epochs):
         # get dataset
-        train_loader = get_voc_data_loader(args, train=True)
-        val_loader = get_voc_data_loader(args, train=False)
+        voc2012_train_loader = get_voc_data_loader(args, train=True)
+        sbd_train_loader = get_sbd_data_loader(args)
+        voc2012_val_loader = get_voc_data_loader(args, train=False)
 
         # val(args, model, scheduler, val_loader, logger, model_saver)
 
@@ -257,8 +257,9 @@ if __name__ == "__main__":
 
         if epoch_now >= args.epochs:
             print('*** Training finished!')
-        train_one_epoch(args, model, optimizer, train_loader, logger, model_saver)
-        val(args, model, scheduler, val_loader, logger, model_saver)
+        train_one_epoch(args, model, optimizer, sbd_train_loader, logger, model_saver)
+        train_one_epoch(args, model, optimizer, voc2012_train_loader, logger, model_saver)
+        val(args, model, scheduler, voc2012_val_loader, logger, model_saver)
 
         model_saver.save(name=args.model_name, model=model)
         model_saver.save(name=args.optimizer, model=optimizer)
