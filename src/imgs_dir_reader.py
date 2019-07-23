@@ -2,10 +2,10 @@
 import os
 from random import shuffle
 
-img_dir = '../test_pic'
+img_dir = '/Users/chenlinwei/dataset/cityscapes/leftImg8bit'
 
 
-def from_dir_get_imgs_list(test_img_dir, use_shuffle: bool = False):
+def from_dir_get_imgs_list(test_img_dir, only_root=False, use_shuffle: bool = False):
     r"""
 
     :param test_img_dir: str of img dir
@@ -17,14 +17,15 @@ def from_dir_get_imgs_list(test_img_dir, use_shuffle: bool = False):
     res = []
     file_format = ['jpg', 'png', 'jpeg', 'gif', 'tiff']
     for root, dirs, files in os.walk(test_img_dir, topdown=True):
-        if test_img_dir == root:
-            print(root, dirs, files)
-            files = [i for i in files if any([j in i for j in file_format])]
-            if use_shuffle:
-                shuffle(files)
-            for file in files:
-                file_path = os.path.join(root, file)
-                res.append(file_path)
+        if only_root and test_img_dir != root:
+            continue
+        print(root, dirs, files)
+        files = [i for i in files if any([j in i for j in file_format])]
+        if use_shuffle:
+            shuffle(files)
+        for file in files:
+            file_path = os.path.join(root, file)
+            res.append(file_path)
     return res
 
 

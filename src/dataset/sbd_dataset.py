@@ -10,6 +10,7 @@ from torchvision.datasets.voc import download_extract
 from torch.utils.data import DataLoader
 import random
 from dataset.segmentation_transform import Compose2, RandomCrop, Normalize, RandomHorizontalFlip, ToTensor
+from dataset.augmentations import PhotometricDistort
 
 
 class SBDataset(VisionDataset):
@@ -141,17 +142,17 @@ class SBDataset(VisionDataset):
         return '\n'.join(lines).format(**self.__dict__)
 
 
-sbd_RGB_mean = [x / 255.0 for x in [116.79657722131293, 111.6543631491467, 103.19907625613395]]
+sbd_RGB_mean = [x / 255.0 for x in [116.77091541098135, 111.68176112561423, 103.1833754149088]]
 sbd_BGR_std = [x / 255.0 for x in [30.670678993140825, 31.103248365270154, 35.49615257511964]]
 
 
 def get_sbd_data_loader(args):
     sbd_transform = Compose2([RandomCrop(size=args.crop_size, pad_if_needed=True),
-                              RandomHorizontalFlip(p=0.5),
+                              RandomHorizontalFlip(p=0.5), PhotometricDistort(),
                               ToTensor(), Normalize(sbd_RGB_mean, sbd_BGR_std)])
 
     bsd_dataset = SBDataset(root=args.sbd_data_path,
-                            image_set='train_noval',
+                            image_set='train_ex_voc2012',
                             mode='segmentation',
                             download=False,
                             transforms=sbd_transform)
@@ -163,7 +164,7 @@ def get_sbd_data_loader(args):
 
 
 if __name__ == '__main__':
-    from train import config
+    from train_fcn import config
 
     root = '/Users/chenlinwei/dataset/SBD/benchmark_RELEASE/dataset'
     args = config()

@@ -2,7 +2,7 @@ from model.fcn import get_model
 import torch
 from PIL import Image
 from torchvision import transforms
-from train import config
+from train_fcn import config
 from imgs_dir_reader import from_dir_get_imgs_list
 import numbers
 from dataset.voc_dataset import COLORMAP, VOC2012_RGB_std, VOC2012_RGB_mean

@@ -5,6 +5,7 @@ import torch
 import numpy as np
 from dataset.segmentation_transform import Compose2, CenterCrop, RandomCrop, Normalize, RandomHorizontalFlip, ToTensor
 from dataset.segmentation_transform import label_to_one_hot
+from dataset.augmentations import PhotometricDistort
 
 CLASSES = ['background',
            'aeroplane', 'bicycle', 'bird', 'boat', 'bottle',
@@ -33,7 +34,7 @@ def image2label(img):
     return np.array(cm2lbl[idx], dtype=np.int64)
 
 
-def get_voc_data_loader(args, train=True):
+def get_voc_data_loader(args, year='2012', train=True):
     """`Pascal VOC <http://host.robots.ox.ac.uk/pascal/VOC/>`_ Segmentation Dataset.
 
         Args:
@@ -52,7 +53,7 @@ def get_voc_data_loader(args, train=True):
     # print(f'*** year:{year}')
 
     voc_train_transform = Compose2([RandomCrop(size=args.crop_size, pad_if_needed=True),
-                                    RandomHorizontalFlip(p=0.5),
+                                    RandomHorizontalFlip(p=0.5), PhotometricDistort(),
                                     ToTensor(), Normalize(VOC2012_RGB_mean, VOC2012_RGB_std)])
 
     voc_val_transform = Compose2([CenterCrop(stride=args.stride),
@@ -60,7 +61,7 @@ def get_voc_data_loader(args, train=True):
 
     if train:
         voc_train_dataset = datasets.VOCSegmentation(root=args.voc_data_path,
-                                                     year='2012',
+                                                     year=year,
                                                      image_set='train',
                                                      download=False,
                                                      transform=None,
@@ -73,7 +74,7 @@ def get_voc_data_loader(args, train=True):
                           pin_memory=True)
     else:
         voc_val_dataset = datasets.VOCSegmentation(root=args.voc_data_path,
-                                                   year='2012',
+                                                   year=year,
                                                    image_set='val',
                                                    download=False,
                                                    transform=None,
@@ -87,7 +88,7 @@ def get_voc_data_loader(args, train=True):
 
 
 def dataset_test():
-    from train import config
+    from train_fcn import config
     from model.fcn import FCN8s, VGGNet
     import torch.nn as nn
     import torch.optim as Opim
